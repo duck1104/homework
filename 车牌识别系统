@@ -1,0 +1,234 @@
+I=imread('原图.jpg');
+figure('name','原图'),imshow(I);title('原图');
+I1=rgb2gray(I); 
+figure('name','灰度处理前'),subplot(1,2,1),imshow(I1);title('灰度处理前的灰度图');
+subplot(1,2,2),imhist(I1);title('灰度处理前的灰度图直方图');
+I1=imadjust(I1,[0.3,0.7],[]);
+figure('name','灰度处理后'),subplot(1,2,1),imshow(I1);title('灰度处理后的灰度图');
+subplot(1,2,2),imhist(I1);title('灰度处理后的灰度图直方图');
+I1=medfilt2(I1);
+figure,imshow(I1);title('中值滤波');
+I2=edge(I1,'roberts',0.05,'both'); 
+figure('name','边缘检测'),imshow(I2);title('robert算子边缘检测');
+se=[1;1;1];
+I3=imerode(I2,se);
+figure('name','腐蚀后图像'),imshow(I3);title('腐蚀后的图像');
+se=strel('rectangle',[20,20]);
+I4=imclose(I3,se);
+figure('name','平滑处理'),imshow(I4);title('平滑图像的轮廓');
+I5=bwareaopen(I4,1000);
+figure('name','移除小对象'),imshow(I5);title('从对象中移除小对象');
+ [y,x,z]=size(I5);
+myI=double(I5);
+tic
+Blue_y=zeros(y,1);
+for i=1:y
+for j=1:x
+if(myI(i,j,1)==1) 
+Blue_y(i,1)= Blue_y(i,1)+1;
+end
+end
+end
+[temp MaxY]=max(Blue_y);
+ PY1=MaxY;
+while ((Blue_y(PY1,1)>=50)&&(PY1>1))
+        PY1=PY1-1;
+ end    
+ PY2=MaxY;
+ while ((Blue_y(PY2,1)>=50)&&(PY2<y))
+        PY2=PY2+1;
+ end
+ IY=I(PY1:PY2,:,:);
+ Blue_x=zeros(1,x);
+ for j=1:x
+     for i=PY1:PY2
+            if(myI(i,j,1)==1)
+                Blue_x(1,j)= Blue_x(1,j)+1;               
+            end  
+     end       
+ end
+  PX1=1;
+ while ((Blue_x(1,PX1)<3)&&(PX1<x))
+       PX1=PX1+1;
+ end    
+ PX2=x;
+ while ((Blue_x(1,PX2)<3)&&(PX2>PX1))
+        PX2=PX2-1;
+ end
+PX1=PX1-1;
+PX2=PX2+1;
+PX2=PX2+3;
+PY2=PY2+10;
+dw=I(PY1:PY2-8,:,:);
+toc
+figure(9),subplot(1,2,1),imshow(IY),title('行方向合理区域');
+figure(9),subplot(1,2,2),imshow(dw),title('定位剪切后的彩色车牌图像');
+imwrite(dw,'dw.jpg');
+a=imread('dw.jpg');
+b=rgb2gray(a);
+imwrite(b,'1.车牌灰度图像.jpg');
+figure(10);subplot(3,2,1),imshow(b),title('1.车牌灰度图像');
+g_max=double(max(max(b)));
+g_min=double(min(min(b)));
+T=round(g_max-(g_max-g_min)/2); 
+[m,n]=size(b);
+d=(double(b)>=T);
+imwrite(d,'2.车牌二值图像.jpg');
+b=imadjust(b,[0.3,0.7],[]);
+subplot(3,2,2),imshow(b);title('2.线性灰度处理后的灰度图');
+d=im2bw(b,0.8);
+imwrite(d,'2.车牌二值图像.jpg');
+subplot(3,2,3),imshow(d),title('3.车牌二值图像');
+d=medfilt2(d);
+imwrite(d,'4.均值滤波后.jpg');
+subplot(3,2,4),imshow(d);title('4.中值滤波后');
+h=fspecial('average',1);
+d=im2bw(round(filter2(h,d)));
+imwrite(d,'4.均值滤波后.jpg');
+subplot(3,2,4),imshow(d),title('4.均值滤波后');
+se=strel('square',3);
+se=eye(2); 
+[m,n]=size(d);
+if bwarea(d)/m/n>=0.365
+d=imerode(d,se);
+elseif bwarea(d)/m/n<=0.235
+d=imdilate(d,se);
+end
+imopen(d,se);
+se=eye(7);
+imopen(d,se);
+imwrite(d,'5.膨胀或腐蚀处理后.jpg');
+subplot(3,2,5),imshow(d),title('5.膨胀或腐蚀处理后');
+d=qiege(d);
+[m,n]=size(d);
+figure,subplot(2,1,1),imshow(d),title(n);
+k1=1;k2=1;
+j=1;
+s=sum(d);
+while j~=n
+        while s(j)==0
+             j=j+1;
+        end
+               k1=j;
+          while s(j)~=0 && j<=n-1
+               j=j+1;
+         end
+                 k2=j-1;
+if k2-k1>=round(n/6.5)
+              [val,num]=min(sum(d(:,[k1+5:k2-5])));
+d(:,k1+num+5)=0;
+end
+end
+d=qiege(d);
+y1=10;y2=0.25;flag=0;word1=[];
+while flag==0
+[m,n]=size(d);
+left=1;
+wide=0;
+while sum(d(:,wide+1))~=0
+wide=wide+1;
+end
+if wide<y1
+d(:,[1:wide])=0; 
+d=qiege(d);
+else
+temp=qiege(imcrop(d,[1 1 wide m]));
+[m,n]=size(temp);
+ all=sum(sum(temp));
+ two_thirds=sum(sum(temp([round(m/3):2*round(m/3)],:)));
+ if two_thirds/all>y2
+ flag=1;word1=temp; 
+end
+ d(:,[1:wide])=0;d=qiege(d);
+end
+end
+[word2,d]=getword(d);
+[word3,d]=getword(d);
+[word4,d]=getword(d);
+[word5,d]=getword(d);
+[word6,d]=getword(d);
+[word7,d]=getword(d);
+subplot(5,7,1),imshow(word1),title('1');
+subplot(5,7,2),imshow(word2),title('2');
+subplot(5,7,3),imshow(word3),title('3');
+subplot(5,7,4),imshow(word4),title('4');
+subplot(5,7,5),imshow(word5),title('5');
+subplot(5,7,6),imshow(word6),title('6');
+subplot(5,7,7),imshow(word7),title('7');
+[m,n]=size(word1);
+
+word1=imresize(word1,[40 20]);
+word2=imresize(word2,[40 20]);
+word3=imresize(word3,[40 20]);
+word4=imresize(word4,[40 20]);
+word5=imresize(word5,[40 20]);
+word6=imresize(word6,[40 20]);
+word7=imresize(word7,[40 20]);
+subplot(5,7,15),imshow(word1),title('11');
+subplot(5,7,16),imshow(word2),title('22');
+subplot(5,7,17),imshow(word3),title('33');
+subplot(5,7,18),imshow(word4),title('44');
+subplot(5,7,19),imshow(word5),title('55');
+subplot(5,7,20),imshow(word6),title('66');
+subplot(5,7,21),imshow(word7),title('77');
+imwrite(word1,'1.jpg'); 
+imwrite(word2,'2.jpg');
+imwrite(word3,'3.jpg');
+imwrite(word4,'4.jpg');
+imwrite(word5,'5.jpg');
+imwrite(word6,'6.jpg');
+imwrite(word7,'7.jpg');
+ liccode=char(['0':'9' 'A':'Z' '陕']);
+SubBw2=zeros(40,20); 
+l=1;
+for I=1:7
+     ii=int2str(I); 
+     t=imread([ii,'.jpg']);
+      SegBw2=imresize(t,[40 20],'nearest'); 
+        if I==1                 
+            kmin=37;
+            kmax=37;
+        elseif I==2             
+            kmin=21;
+            kmax=21;
+        else            
+            kmin=9;
+            kmax=9;        
+        end
+        
+        for k2=kmin:kmax
+            fname=strcat('字符模板\',liccode(k2),'.jpg'); 
+            SamBw2 = imread(fname);
+            for  i=1:40
+                for j=1:20
+                    
+                end
+            end
+            Dmax=0;
+            for k1=1:40
+                for l1=1:20
+                    if  ( SubBw2(k1,l1) > 10 || SubBw2(k1,l1) < -10 ) 
+                        Dmax=Dmax+1;
+                    end
+                end
+            end
+            Error(k2)=Dmax; 
+        end      
+        Error1=Error(kmin:kmax);
+        MinError=min(Error1); 
+        findc=find(Error1==MinError); 
+        Code(l*2-1)=liccode(findc(1)+kmin-1);
+        Code(l*2)=' ';
+       l=l+1;
+end
+figure(12),subplot(5,7,1:7),imshow(dw),title('第一步：车牌定位'),
+xlabel({'第二步：车牌分割'}); 
+subplot(6,7,15),imshow(word1);
+subplot(6,7,16),imshow(word2);
+subplot(6,7,17),imshow(word3);
+subplot(6,7,18),imshow(word4);
+subplot(6,7,19),imshow(word5);
+subplot(6,7,20),imshow(word6);
+subplot(6,7,21),imshow(word7);
+subplot(6,7,22:42),imshow('dw.jpg');
+xlabel(['第三步：识别结果为: ', Code],'Color','b');
